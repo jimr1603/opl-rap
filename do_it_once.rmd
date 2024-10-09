@@ -1,0 +1,358 @@
+---
+title: "Placeholder"
+output: html_document
+params: 
+  fed: "BP"
+  report_year: 2023
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library("tidyverse")
+library("arrow")
+library("DT")
+theme_set(ggthemes::theme_few())
+
+```
+
+```{r}
+# Grab the params from metadata/render arguments.
+fed = params$fed
+report_year = params$report_year
+```
+
+
+```{r}
+#For these data is easiest to declare what each column should be rather than letting Arrow guess
+the_actual_scheme = schema(Name = utf8(), Sex = utf8(), Event = utf8(), Equipment = utf8(), 
+                            Age = float64(), AgeClass = utf8(), BirthYearClass = utf8(), 
+                            Division = utf8(), BodyweightKg = float64(), WeightClassKg = utf8(), 
+                            Squat1Kg = float64(), Squat2Kg = float64(), Squat3Kg = float64(), 
+                            Squat4Kg = float64(), Best3SquatKg = float64(), Bench1Kg = float64(), 
+                            Bench2Kg = float64(), Bench3Kg = float64(), Bench4Kg = float64(), 
+                            Best3BenchKg = float64(), Deadlift1Kg = float64(), Deadlift2Kg = float64(), 
+                            Deadlift3Kg = float64(), Deadlift4Kg = float64(), Best3DeadliftKg = float64(), 
+                            TotalKg = float64(), Place = utf8(), Dots = float64(), Wilks = float64(), 
+                            Glossbrenner = float64(), Goodlift = float64(), Tested = utf8(), 
+                            Country = utf8(), State = utf8(), Federation = utf8(), ParentFederation = utf8(), 
+                            Date = date32(), MeetCountry = utf8(), MeetState = utf8(), 
+                            MeetTown = utf8(), MeetName = utf8(), Sanctioned = utf8())
+```
+
+```{r}
+#load the data
+data = open_dataset(
+   "data/openpowerlifting-2024-10-05/openpowerlifting-2024-10-05-c40afca0.csv",
+   format = "csv" ,
+   schema = the_actual_scheme,
+   skip = 1) %>% 
+  filter(Federation == fed) %>% 
+  #Year of comp is useful for an end of year report
+  mutate(Year = lubridate::year(Date))
+```
+
+
+
+```{r}
+# distinct lifters in that year.
+# NB: as far as is currently disambiguated.
+
+distinct_lifters = data %>% 
+  filter(Year == report_year) %>% 
+  distinct(Name) %>% 
+  summarise(n=n()) %>% 
+  collect() %>% 
+  pull()
+```
+
+# Participiation
+
+In `r report_year` there were `r distinct_lifters` distinct[^1] lifters in `r fed`.
+
+[^1]: At least as far as OpenPowerlifting can tell lifters apart, which is through manually disambiguating lifters with the same name. If two people have the same name then they might look like the same person. Less common is when someone changes their name or makes small changes to its spelling, causing errors in the other direction. 
+
+
+```{r}
+# Let's graph this too. 
+
+data %>% 
+  filter(Year <= report_year) %>% 
+  distinct(Name, Year) %>%
+  summarise(n=n(), .by=Year) %>% 
+  collect() %>% 
+  ggplot(aes(x=Year,y=n)) +
+    geom_col() +
+    labs(y = "distinct lifters")
+```
+
+NB: Data are less reliable in earlier years. Data is pretty reliable once the fed starts using [OpenLifter](https://www.openlifter.com/en/).
+
+# Year records
+
+## Total:
+
+```{r}
+# max lifts for that year
+
+data %>% 
+  filter(Year == report_year) %>% 
+  filter(!is.na(TotalKg)) %>% 
+  #Less columns shrinks the memory requirements for the collect
+  select(Name, Sex, Equipment, Division, 
+         WeightClassKg, TotalKg) %>% 
+  collect() %>% 
+  #grab the top record for each class
+  group_by(Sex, Equipment,  Division, WeightClassKg) %>%  
+  slice_max(n=1, order_by = TotalKg) %>% 
+  ungroup() %>% 
+  #reformat some cols for DT filters
+  mutate(Sex = as_factor(Sex),
+         Equipment = as_factor(Equipment),
+         Division = as_factor(Division),
+         WeightClassKg = as_factor(WeightClassKg)) %>% 
+  #too much data, make a DT output.
+  DT::datatable(filter = "top", 
+                rownames = FALSE)
+```
+
+## Squat:
+
+```{r}
+# max squat for that year
+# Arrow is not playing nicely with wanting to make this modular. Copy-paste it is.
+
+data %>% 
+  filter(Year == report_year) %>% 
+  filter(!is.na(Best3SquatKg)) %>% 
+  #Less columns shrinks the memory requirements for the collect
+  select(Name, Sex, Equipment, Division, 
+         WeightClassKg, Best3SquatKg) %>% 
+  collect() %>% 
+  #grab the top record for each class
+  group_by(Sex, Equipment,  Division, WeightClassKg) %>%  
+  slice_max(n=1, order_by = Best3SquatKg) %>% 
+  ungroup() %>% 
+  #reformat some cols for DT filters
+  mutate(Sex = as_factor(Sex),
+         Equipment = as_factor(Equipment),
+         Division = as_factor(Division),
+         WeightClassKg = as_factor(WeightClassKg)) %>% 
+  #too much data, make a DT output.
+  DT::datatable(filter = "top", 
+                rownames = FALSE)
+```
+
+## Bench:
+
+```{r}
+# max bench for that year
+# Arrow is not playing nicely with wanting to make this modular. Copy-paste it is.
+
+data %>% 
+  filter(Year == report_year) %>% 
+  filter(!is.na(Best3BenchKg)) %>% 
+  #Less columns shrinks the memory requirements for the collect
+  select(Name, Sex, Equipment, Division, 
+         WeightClassKg, Best3BenchKg) %>% 
+  collect() %>% 
+  #grab the top record for each class
+  group_by(Sex, Equipment,  Division, WeightClassKg) %>%  
+  slice_max(n=1, order_by = Best3BenchKg) %>% 
+  ungroup() %>% 
+  #reformat some cols for DT filters
+  mutate(Sex = as_factor(Sex),
+         Equipment = as_factor(Equipment),
+         Division = as_factor(Division),
+         WeightClassKg = as_factor(WeightClassKg)) %>% 
+  #too much data, make a DT output.
+  DT::datatable(filter = "top", 
+                rownames = FALSE)
+```
+
+## Deadlift:
+
+```{r}
+# max deadlift for that year
+# Arrow is not playing nicely with wanting to make this modular. Copy-paste it is.
+
+data %>% 
+  filter(Year == report_year) %>% 
+  filter(!is.na(Best3DeadliftKg)) %>% 
+  #Less columns shrinks the memory requirements for the collect
+  select(Name, Sex, Equipment, Division, 
+         WeightClassKg, Best3DeadliftKg) %>% 
+  collect() %>% 
+  #grab the top record for each class
+  group_by(Sex, Equipment,  Division, WeightClassKg) %>%  
+  slice_max(n=1, order_by = Best3DeadliftKg) %>% 
+  ungroup() %>% 
+  #reformat some cols for DT filters
+  mutate(Sex = as_factor(Sex),
+         Equipment = as_factor(Equipment),
+         Division = as_factor(Division),
+         WeightClassKg = as_factor(WeightClassKg)) %>% 
+  #too much data, make a DT output.
+  DT::datatable(filter = "top", 
+                rownames = FALSE)
+```
+
+# All Time* Records in `r report_year`
+
+NB: All Time only covers meets that are in the OpenPowerlifting database. If `r fed` claims other records, believe them not this.
+
+## Total:
+
+```{r}
+#Yes, it is a modified version of the above tables, with the filter on year later in the pipeline
+
+data %>% 
+  filter(!is.na(TotalKg)) %>% 
+  #Less columns shrinks the memory requirements for the collect
+  select(Name, Sex, Equipment, Division, 
+         WeightClassKg, TotalKg, Year) %>% 
+  collect() %>% 
+  #grab the top record for each class
+  group_by(Sex, Equipment,  Division, WeightClassKg) %>%  
+  slice_max(n=1, order_by = TotalKg) %>% 
+  ungroup() %>% 
+  
+  filter(Year == report_year) %>% 
+  #reformat some cols for DT filters
+  mutate(Sex = as_factor(Sex),
+         Equipment = as_factor(Equipment),
+         Division = as_factor(Division),
+         WeightClassKg = as_factor(WeightClassKg)) %>% 
+  #too much data, make a DT output.
+  DT::datatable(filter = "top", 
+                rownames = FALSE)
+```
+
+
+## Squat:
+
+```{r}
+data %>% 
+  filter(!is.na(Best3SquatKg)) %>% 
+  #Less columns shrinks the memory requirements for the collect
+  select(Name, Sex, Equipment, Division, 
+         WeightClassKg, Best3SquatKg, Year) %>% 
+  collect() %>% 
+  #grab the top record for each class
+  group_by(Sex, Equipment,  Division, WeightClassKg) %>%  
+  slice_max(n=1, order_by = Best3SquatKg) %>% 
+  ungroup() %>% 
+  
+  filter(Year == report_year) %>% 
+  #reformat some cols for DT filters
+  mutate(Sex = as_factor(Sex),
+         Equipment = as_factor(Equipment),
+         Division = as_factor(Division),
+         WeightClassKg = as_factor(WeightClassKg)) %>% 
+  #too much data, make a DT output.
+  DT::datatable(filter = "top", 
+                rownames = FALSE)
+```
+
+## Bench:
+
+```{r}
+data %>% 
+  filter(!is.na(Best3BenchKg)) %>% 
+  #Less columns shrinks the memory requirements for the collect
+  select(Name, Sex, Equipment, Division, 
+         WeightClassKg, Best3BenchKg, Year) %>% 
+  collect() %>% 
+  #grab the top record for each class
+  group_by(Sex, Equipment,  Division, WeightClassKg) %>%  
+  slice_max(n=1, order_by = Best3BenchKg) %>% 
+  ungroup() %>% 
+  
+  filter(Year == report_year) %>% 
+  #reformat some cols for DT filters
+  mutate(Sex = as_factor(Sex),
+         Equipment = as_factor(Equipment),
+         Division = as_factor(Division),
+         WeightClassKg = as_factor(WeightClassKg)) %>% 
+  #too much data, make a DT output.
+  DT::datatable(filter = "top", 
+                rownames = FALSE)
+```
+
+## Deadlift:
+
+```{r}
+data %>% 
+  filter(!is.na(Best3DeadliftKg)) %>% 
+  #Less columns shrinks the memory requirements for the collect
+  select(Name, Sex, Equipment, Division, 
+         WeightClassKg, Best3DeadliftKg, Year) %>% 
+  collect() %>% 
+  #grab the top record for each class
+  group_by(Sex, Equipment,  Division, WeightClassKg) %>%  
+  slice_max(n=1, order_by = Best3DeadliftKg) %>% 
+  ungroup() %>% 
+  
+  filter(Year == report_year) %>% 
+  #reformat some cols for DT filters
+  mutate(Sex = as_factor(Sex),
+         Equipment = as_factor(Equipment),
+         Division = as_factor(Division),
+         WeightClassKg = as_factor(WeightClassKg)) %>% 
+  #too much data, make a DT output.
+  DT::datatable(filter = "top", 
+                rownames = FALSE)
+```
+
+# Bits and Bobs
+
+```{r}
+# how many people bombed?
+
+bombed = data %>% 
+  filter(Year == report_year) %>% 
+  #start collecting the bombs
+  filter(is.na(TotalKg)) %>%
+  #start removing no-shows/no attempts recorded
+  select(Squat1Kg:Deadlift4Kg) %>% 
+  collect() %>% 
+  #temp column to keep track of distinct lifters.
+  mutate(id = row_number()) %>% 
+  pivot_longer(-id) %>% 
+  #Any value that isn't NA will be an (un)successful lift
+  filter(!is.na(value)) %>% 
+  distinct(id) %>% 
+  nrow()
+
+```
+
+In `r report_year` `r bombed` people tried, but failed to put up a total. Or 'bombed'. Better luck next time.
+
+## Tonnage lifted
+
+```{r}
+data %>% 
+  filter(Year == report_year) %>% 
+  #select dates and lifts
+  select(Date, Squat1Kg:Deadlift4Kg) %>% 
+  #remove best lifts
+  select(-c(Best3SquatKg, Best3BenchKg)) %>% 
+  collect() %>% 
+  pivot_longer(-Date) %>% 
+  rename(Lift = name, kg = value) %>% 
+  #failed lifts are logged as -ve values.
+  filter(kg > 0, !is.na(kg)) %>%
+  # rename to just Squat/Bench/Deadlift
+  mutate(Lift = str_extract(Lift, "^[SBD][a-z]+")) %>% 
+  
+  arrange(Date) %>% 
+  #Cumulative poundage
+  mutate(kg = cumsum(kg), .by=Lift) %>% 
+  # make Lifts a factor for the 'right' ordering
+  mutate(Lift = as_factor(Lift)) %>% 
+  mutate(Lift = fct_relevel(Lift, c("Squat", "Bench", "Deadlift"))) %>% 
+  ggplot(aes(x=Date,y=kg,fill = Lift)) + geom_area() +
+    ggthemes::scale_fill_few() +
+    facet_wrap("Lift") +
+  scale_y_continuous(labels = scales::label_comma())
+
+```
