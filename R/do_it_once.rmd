@@ -42,7 +42,7 @@ the_actual_scheme = schema(Name = utf8(), Sex = utf8(), Event = utf8(), Equipmen
 ```{r}
 #load the data
 data = open_dataset(
-   "data/openpowerlifting-2024-10-05/openpowerlifting-2024-10-05-c40afca0.csv",
+   here::here("input", "openpl", "openpowerlifting.csv"),
    format = "csv" ,
    schema = the_actual_scheme,
    skip = 1) %>% 
